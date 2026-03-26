@@ -31,7 +31,7 @@ public class CargarUsuariosBasicos implements CommandLineRunner {
     public void run(String... args) {
 
                 crearOActualizarUsuarioBase(
-                "jaiandroaber@gmail.com",   // correo
+                "jaiandroabeer@gmail.com",   // correo
                 "Administrador",            // nombre
                 "Administrador#2026",            // contraseña
                 "1000070000",               // cédula
