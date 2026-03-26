@@ -106,8 +106,8 @@ public class UsuarioServiceImpl implements UsuarioService {
             entity.setEstadoRegistro(EstadoRegistro.APROBADO); // Ciudadano y Administrador se aprueban automáticamente
         } else {
             entity.setEstadoRegistro(EstadoRegistro.PENDIENTE_DOCUMENTACION); // Reciclador y Empresa deben subir
-                                                                              // documentos y ser revisados por admin
-                                                                              // antes de aprobar
+            // documentos y ser revisados por admin
+            // antes de aprobar
         }
 
         // Fechas
@@ -176,81 +176,81 @@ public class UsuarioServiceImpl implements UsuarioService {
 
 
     @Override
-public String subirDocumento(MultipartFile file, Long idUsuario, String tipo) throws IOException {
+    public String subirDocumento(MultipartFile file, Long idUsuario, String tipo) throws IOException {
 
-    if (file == null || file.isEmpty()) {
-        throw new RuntimeException("Archivo no enviado");
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("Archivo no enviado");
+        }
+
+        UsuarioEntity usuario = usuarioRepository.findById(idUsuario)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        String folder = "usuarios/" + idUsuario;
+        String publicId = tipo + "_" + System.currentTimeMillis();
+
+        String url = cloudinaryService.upload(file, folder, publicId);
+
+        switch (tipo.toUpperCase()) {
+
+            case "CEDULA":
+                usuario.setDocumento(url);
+                break;
+
+            case "CERTIFICADO":
+                usuario.setCertificaciones(url);
+                break;
+
+            case "RUT":
+                usuario.setRut(url);
+                break;
+
+            case "CAMARA":
+                usuario.setCamara_comercio(url);
+                break;
+
+            case "FOTO_PERFIL":
+                usuario.setImagen_perfil(url);
+                break;
+
+            default:
+                throw new RuntimeException("Tipo de documento no válido");
+        }
+
+        validarEstadoDocumentacion(usuario);
+
+        usuario.setFechaActualizacion(LocalDateTime.now());
+        usuarioRepository.save(usuario);
+
+        return url;
     }
 
-    UsuarioEntity usuario = usuarioRepository.findById(idUsuario)
-            .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+    private void validarEstadoDocumentacion(UsuarioEntity usuario) {
 
-    String folder = "usuarios/" + idUsuario;
-    String publicId = tipo + "_" + System.currentTimeMillis();
+        String rol = usuario.getRol().getTipo().name();
 
-    String url = cloudinaryService.upload(file, folder, publicId);
+        boolean documentosCompletos = false;
 
-    switch (tipo.toUpperCase()) {
+        if (rol.equals("Empresa")) {
 
-        case "CEDULA":
-            usuario.setDocumento(url);
-            break;
+            documentosCompletos =
+                    usuario.getDocumento() != null &&
+                            usuario.getRut() != null &&
+                            usuario.getCamara_comercio() != null;
 
-        case "CERTIFICADO":
-            usuario.setCertificaciones(url);
-            break;
+        } else if (rol.equals("Reciclador")) {
 
-        case "RUT":
-            usuario.setRut(url);
-            break;
+            documentosCompletos =
+                    usuario.getDocumento() != null;
+        }
 
-        case "CAMARA":
-            usuario.setCamara_comercio(url);
-            break;
-
-        case "FOTO_PERFIL":
-            usuario.setImagen_perfil(url);
-            break;
-
-        default:
-            throw new RuntimeException("Tipo de documento no válido");
+        if (documentosCompletos) {
+            usuario.setEstadoRegistro(EstadoRegistro.PENDIENTE_REVISAR);
+        } else {
+            usuario.setEstadoRegistro(EstadoRegistro.PENDIENTE_DOCUMENTACION);
+        }
     }
 
-    validarEstadoDocumentacion(usuario);
 
-    usuario.setFechaActualizacion(LocalDateTime.now());
-    usuarioRepository.save(usuario);
-
-    return url;
-}
-
-private void validarEstadoDocumentacion(UsuarioEntity usuario) {
-
-    String rol = usuario.getRol().getTipo().name();
-
-    boolean documentosCompletos = false;
-
-    if (rol.equals("Empresa")) {
-
-        documentosCompletos =
-                usuario.getDocumento() != null &&
-                usuario.getRut() != null &&
-                usuario.getCamara_comercio() != null;
-
-    } else if (rol.equals("Reciclador")) {
-
-        documentosCompletos =
-                usuario.getDocumento() != null;
-    }
-
-    if (documentosCompletos) {
-        usuario.setEstadoRegistro(EstadoRegistro.PENDIENTE_REVISAR);
-    } else {
-        usuario.setEstadoRegistro(EstadoRegistro.PENDIENTE_DOCUMENTACION);
-    }
-}
-
-   
     // ========================================================
     // GENERAR PLANTILLA POR ROL
     // ========================================================
@@ -423,11 +423,12 @@ private void validarEstadoDocumentacion(UsuarioEntity usuario) {
     }
 
     @Override
-    public void eliminacionPorEstado(Long idUsuario) {
-        int filasActualizadas = usuarioRepository.eliminacionLogica(idUsuario);
-        if (filasActualizadas == 0) {
-            throw new RuntimeException("Usuario no encontrado con ID: " + idUsuario);
-        }
+    public void eliminacionPorEstado(Long id) {
+        UsuarioEntity usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con id: " + id));
+        // Alternar estado: true -> false, false -> true
+        usuario.setEstado(!usuario.getEstado());
+        usuarioRepository.save(usuario);
     }
 
     @Override
